@@ -22,6 +22,14 @@ export async function migrate(): Promise<void> {
         status TEXT DEFAULT 'active', registered_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS age TEXT`
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS height TEXT`
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS weight TEXT`
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS religion TEXT`
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS state TEXT`
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS lga TEXT`
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS address TEXT`
+    await execute`ALTER TABLE members ADD COLUMN IF NOT EXISTS nin TEXT UNIQUE`
     await execute`
       CREATE TABLE IF NOT EXISTS books (
         id TEXT PRIMARY KEY, isbn TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL,

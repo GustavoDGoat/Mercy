@@ -134,6 +134,10 @@ export default function LoginPage() {
               <p className="text-xs text-center text-muted-foreground">
                 Multi-factor authentication will be required after sign in.
               </p>
+              <p className="text-xs text-center text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <a href="/register" className="text-primary hover:underline font-medium">Register as Student</a>
+              </p>
             </form>
           ) : (
             <div className="space-y-6 text-center">

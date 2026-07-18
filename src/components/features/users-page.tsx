@@ -35,11 +35,15 @@ const roleIcons: Record<string, React.ReactNode> = {
 interface AccountForm {
   email: string; password: string; firstName: string; lastName: string
   phone: string; matricNumber: string; department: string; faculty: string; level: string
+  age: string; height: string; weight: string; religion: string
+  state: string; lga: string; address: string; nin: string
 }
 
 const emptyAccountForm: AccountForm = {
   email: "", password: "", firstName: "", lastName: "",
   phone: "", matricNumber: "", department: "", faculty: "", level: "100L",
+  age: "", height: "", weight: "", religion: "",
+  state: "", lga: "", address: "", nin: "",
 }
 
 export function UsersPage() {
@@ -204,6 +208,7 @@ export function UsersPage() {
                 <div className="space-y-2 col-span-2"><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required disabled={saving} /></div>
                 <div className="space-y-2 col-span-2"><Label>Password *</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} placeholder="Min. 6 characters" disabled={saving} /></div>
                 <div className="space-y-2"><Label>Matric Number *</Label><Input value={form.matricNumber} onChange={(e) => setForm({ ...form, matricNumber: e.target.value })} required disabled={saving} /></div>
+                <div className="space-y-2"><Label>NIN</Label><Input value={form.nin} onChange={(e) => setForm({ ...form, nin: e.target.value })} disabled={saving} placeholder="NIN Number" /></div>
                 <div className="space-y-2"><Label>Level</Label>
                   <Select value={form.level} onValueChange={(v) => setForm({ ...form, level: v ?? "100L" })} disabled={saving}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -214,9 +219,16 @@ export function UsersPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2"><Label>Age</Label><Input type="number" min="15" max="100" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} disabled={saving} /></div>
                 <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={saving} /></div>
                 <div className="space-y-2"><Label>Department</Label><Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} disabled={saving} /></div>
                 <div className="space-y-2"><Label>Faculty</Label><Input value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} disabled={saving} /></div>
+                <div className="space-y-2"><Label>State</Label><Input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} disabled={saving} /></div>
+                <div className="space-y-2"><Label>LGA</Label><Input value={form.lga} onChange={(e) => setForm({ ...form, lga: e.target.value })} disabled={saving} /></div>
+                <div className="space-y-2"><Label>Height</Label><Input value={form.height} onChange={(e) => setForm({ ...form, height: e.target.value })} disabled={saving} placeholder="e.g. 5ft 8in" /></div>
+                <div className="space-y-2"><Label>Weight</Label><Input value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} disabled={saving} placeholder="e.g. 70kg" /></div>
+                <div className="space-y-2"><Label>Religion</Label><Input value={form.religion} onChange={(e) => setForm({ ...form, religion: e.target.value })} disabled={saving} /></div>
+                <div className="space-y-2 col-span-2"><Label>Address</Label><Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} disabled={saving} /></div>
               </div>
               {error && <p className="text-sm text-destructive bg-destructive/10 py-2 px-3 rounded">{error}</p>}
             </div>

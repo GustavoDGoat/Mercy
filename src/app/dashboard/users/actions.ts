@@ -53,6 +53,8 @@ export async function createStudentAccount(data: {
   email: string; password: string; firstName: string; lastName: string
   phone?: string; matricNumber: string; department?: string
   faculty?: string; level?: string
+  age?: string; height?: string; weight?: string; religion?: string
+  state?: string; lga?: string; address?: string; nin?: string
 }) {
   const session = await requireRole("admin")
 
@@ -61,6 +63,11 @@ export async function createStudentAccount(data: {
 
   const existingMember = await querySingle`SELECT id FROM members WHERE matric_number = ${data.matricNumber}`
   if (existingMember) return { error: "A member with this matric number already exists" }
+
+  if (data.nin) {
+    const existingNin = await querySingle`SELECT id FROM members WHERE nin = ${data.nin}`
+    if (existingNin) return { error: "A member with this NIN already exists" }
+  }
 
   const userId = crypto.randomUUID()
   const memberId = `SE-${Date.now().toString(36).toUpperCase()}`
@@ -74,8 +81,8 @@ export async function createStudentAccount(data: {
   `
 
   await execute`
-    INSERT INTO members (id, user_id, first_name, last_name, email, phone, matric_number, department, faculty, level, max_borrow_limit, status, registered_at, updated_at)
-    VALUES (${memberId}, ${userId}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.matricNumber}, ${data.department || null}, ${data.faculty || null}, ${data.level || "100L"}, 4, 'active', ${now}, ${now})
+    INSERT INTO members (id, user_id, first_name, last_name, email, phone, matric_number, department, faculty, level, age, height, weight, religion, state, lga, address, nin, max_borrow_limit, status, registered_at, updated_at)
+    VALUES (${memberId}, ${userId}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone || null}, ${data.matricNumber}, ${data.department || null}, ${data.faculty || null}, ${data.level || "100L"}, ${data.age || null}, ${data.height || null}, ${data.weight || null}, ${data.religion || null}, ${data.state || null}, ${data.lga || null}, ${data.address || null}, ${data.nin || null}, 4, 'active', ${now}, ${now})
   `
 
   await createAuditEntry(session.userId, "register_member", `Created student account: ${data.email} (Matric: ${data.matricNumber})`)

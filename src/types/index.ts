@@ -47,6 +47,14 @@ export interface Member {
   level: string
   maxBorrowLimit: number
   status: MemberStatus
+  age?: string
+  height?: string
+  weight?: string
+  religion?: string
+  state?: string
+  lga?: string
+  address?: string
+  nin?: string
   registeredAt: string
   updatedAt: string
 }
