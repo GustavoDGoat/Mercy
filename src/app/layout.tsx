@@ -32,7 +32,7 @@ export default async function RootLayout({
     await migrate()
     await seedDatabase()
   } catch (e) {
-    console.error("[Root] DB init failed (non-blocking):", (e as Error).message)
+    console.error("[Root] DB init failed:", (e as Error).message)
   }
 
   return (
