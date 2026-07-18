@@ -4,7 +4,8 @@ let pool: Pool | null = null
 let lastPoolInit = 0
 
 function getConnString(): string {
-  return process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING || ""
+  const url = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || ""
+  return url.replace(/([?&])sslmode=[^&]*&?/g, "$1").replace(/[?&]$/, "")
 }
 
 function getPool(): Pool {
