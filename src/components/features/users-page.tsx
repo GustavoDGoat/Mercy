@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Loader2, Users, Trash2, Shield, BookOpen, UserCog, Plus, UserPlus } from "lucide-react"
+import { Loader2, Users, Trash2, Shield, BookOpen, UserCog, Plus, UserPlus, AlertCircle, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -52,9 +52,21 @@ export function UsersPage() {
   const [form, setForm] = useState<AccountForm>(emptyAccountForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const [pageError, setPageError] = useState("")
 
   async function loadData() {
-    try { setUsers(await getUsers()) } catch { setError("Failed to load users") } finally { setLoading(false) }
+    try {
+      const data = await getUsers()
+      setUsers(data)
+      setPageError("")
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to load users"
+      console.error("[Users] loadData failed:", msg)
+      setPageError(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { loadData() }, [])
@@ -74,9 +86,19 @@ export function UsersPage() {
     try {
       const action = createRole === "student" ? createStudentAccount : createLibrarianAccount
       const result = await action(form)
-      if (result && "error" in result) { setError(result.error as string); return }
-      setCreateDialogOpen(false); setForm(emptyAccountForm); loadData()
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed to create account") } finally { setSaving(false) }
+      if (result && "error" in result) {
+        setError(result.error as string)
+        return
+      }
+      await loadData()
+      setCreateDialogOpen(false)
+      setForm(emptyAccountForm)
+      const label = createRole === "student" ? "Student" : "Librarian"
+      setSuccess(`${label} account created: ${form.email}`)
+      setTimeout(() => setSuccess(""), 5000)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to create account")
+    } finally { setSaving(false) }
   }
 
   function openCreate(role: "student" | "librarian") {
@@ -119,6 +141,24 @@ export function UsersPage() {
         ))}
       </div>
 
+      {success && (
+        <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+          <p className="text-sm font-medium text-green-700 dark:text-green-400">{success}</p>
+        </div>
+      )}
+
+      {pageError && (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-destructive">Error loading users</p>
+            <p className="text-xs text-destructive/70 mt-0.5 font-mono break-all">{pageError}</p>
+          </div>
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={loadData}>Retry</Button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -150,7 +190,7 @@ export function UsersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+      <Dialog open={createDialogOpen} onOpenChange={(open) => { if (!saving) setCreateDialogOpen(open) }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add {createRole === "student" ? "Student" : "Librarian"} Account</DialogTitle>
@@ -159,13 +199,13 @@ export function UsersPage() {
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-4 p-1">
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>First Name *</Label><Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required /></div>
-                <div className="space-y-2"><Label>Last Name *</Label><Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required /></div>
-                <div className="space-y-2 col-span-2"><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required /></div>
-                <div className="space-y-2 col-span-2"><Label>Password *</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} placeholder="Min. 6 characters" /></div>
-                <div className="space-y-2"><Label>Matric Number *</Label><Input value={form.matricNumber} onChange={(e) => setForm({ ...form, matricNumber: e.target.value })} required /></div>
+                <div className="space-y-2"><Label>First Name *</Label><Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required disabled={saving} /></div>
+                <div className="space-y-2"><Label>Last Name *</Label><Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required disabled={saving} /></div>
+                <div className="space-y-2 col-span-2"><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required disabled={saving} /></div>
+                <div className="space-y-2 col-span-2"><Label>Password *</Label><Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} placeholder="Min. 6 characters" disabled={saving} /></div>
+                <div className="space-y-2"><Label>Matric Number *</Label><Input value={form.matricNumber} onChange={(e) => setForm({ ...form, matricNumber: e.target.value })} required disabled={saving} /></div>
                 <div className="space-y-2"><Label>Level</Label>
-                  <Select value={form.level} onValueChange={(v) => setForm({ ...form, level: v ?? "100L" })}>
+                  <Select value={form.level} onValueChange={(v) => setForm({ ...form, level: v ?? "100L" })} disabled={saving}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {createRole === "student"
@@ -174,17 +214,17 @@ export function UsersPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Department</Label><Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Faculty</Label><Input value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={saving} /></div>
+                <div className="space-y-2"><Label>Department</Label><Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} disabled={saving} /></div>
+                <div className="space-y-2"><Label>Faculty</Label><Input value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })} disabled={saving} /></div>
               </div>
               {error && <p className="text-sm text-destructive bg-destructive/10 py-2 px-3 rounded">{error}</p>}
             </div>
           </ScrollArea>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={saving}>Cancel</Button>
             <Button onClick={handleCreateAccount} disabled={saving || !form.email || !form.password || !form.firstName || !form.lastName || !form.matricNumber}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : `Create ${createRole === "student" ? "Student" : "Librarian"}`}
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin" />Creating...</> : `Create ${createRole === "student" ? "Student" : "Librarian"}`}
             </Button>
           </DialogFooter>
         </DialogContent>

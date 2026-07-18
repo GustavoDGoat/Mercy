@@ -9,20 +9,25 @@ import { createAuditEntry } from "@/lib/audit"
 export async function getUsers() {
   await requireRole("admin")
 
-  const rows = await sql<Record<string, unknown>>`
-    SELECT u.*, m.first_name as m_first, m.last_name as m_last
-    FROM users u
-    LEFT JOIN members m ON u.member_id = m.id
-    ORDER BY u.role, u.last_name
-  `
+  try {
+    const rows = await sql<Record<string, unknown>>`
+      SELECT u.*, m.first_name as m_first, m.last_name as m_last
+      FROM users u
+      LEFT JOIN members m ON u.member_id = m.id
+      ORDER BY u.role, u.last_name
+    `
 
-  return rows.map((r) => ({
-    id: r.id as string, email: r.email as string,
-    firstName: r.first_name as string, lastName: r.last_name as string,
-    role: r.role as string, memberId: r.member_id as string | undefined,
-    memberName: r.m_first ? `${r.m_first} ${r.m_last}` : null,
-    createdAt: r.created_at as string, updatedAt: r.updated_at as string,
-  }))
+    return rows.map((r) => ({
+      id: r.id as string, email: r.email as string,
+      firstName: r.first_name as string, lastName: r.last_name as string,
+      role: r.role as string, memberId: r.member_id as string | undefined,
+      memberName: r.m_first ? `${r.m_first} ${r.m_last}` : null,
+      createdAt: r.created_at as string, updatedAt: r.updated_at as string,
+    }))
+  } catch (e: unknown) {
+    console.error("[Users] getUsers failed:", (e as Error).message)
+    throw e
+  }
 }
 
 export async function deleteUser(userId: string) {
