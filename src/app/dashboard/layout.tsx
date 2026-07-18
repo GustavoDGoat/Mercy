@@ -16,9 +16,33 @@ export default async function DashboardLayout({
     redirect("/login")
   }
 
-  const user = await querySingle<Record<string, unknown>>`
-    SELECT first_name, last_name, email, role FROM users WHERE id = ${session.userId}
-  `
+  let user: Record<string, unknown> | null = null
+  let dbError: string | null = null
+
+  try {
+    user = await querySingle<Record<string, unknown>>`
+      SELECT first_name, last_name, email, role FROM users WHERE id = ${session.userId}
+    `
+  } catch (e: unknown) {
+    const err = e as { message?: string; code?: string }
+    console.error("[Dashboard] Postgres query failed:", err.message || err)
+    dbError = err.message || "Database connection failed"
+  }
+
+  if (dbError) {
+    return (
+      <html>
+        <body>
+          <div style={{ padding: "2rem", fontFamily: "monospace" }}>
+            <h1>Database Error</h1>
+            <p>{dbError}</p>
+            <p style={{ color: "#666" }}>Check Vercel environment variables and Supabase connection.</p>
+          </div>
+        </body>
+      </html>
+    )
+  }
+
   if (!user) {
     await validateAndClearSession()
     redirect("/login")
