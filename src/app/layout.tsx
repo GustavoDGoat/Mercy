@@ -24,12 +24,16 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [{ migrate }, { seedDatabase }] = await Promise.all([
-    import("@/lib/migrate"),
-    import("@/lib/seed"),
-  ])
-  await migrate()
-  await seedDatabase()
+  try {
+    const [{ migrate }, { seedDatabase }] = await Promise.all([
+      import("@/lib/migrate"),
+      import("@/lib/seed"),
+    ])
+    await migrate()
+    await seedDatabase()
+  } catch (e) {
+    console.error("[Root] DB init failed (non-blocking):", (e as Error).message)
+  }
 
   return (
     <html

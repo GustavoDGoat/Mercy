@@ -4,7 +4,7 @@ let pool: Pool | null = null
 let lastPoolInit = 0
 
 function getConnString(): string {
-  const url = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || ""
+  const url = process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING || ""
 
   if (process.env.NODE_ENV === "development") {
     return url.replace(/([?&])sslmode=[^&]*/g, "$1sslmode=no-verify")

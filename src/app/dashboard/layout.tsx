@@ -31,15 +31,11 @@ export default async function DashboardLayout({
 
   if (dbError) {
     return (
-      <html>
-        <body>
-          <div style={{ padding: "2rem", fontFamily: "monospace" }}>
-            <h1>Database Error</h1>
-            <p>{dbError}</p>
-            <p style={{ color: "#666" }}>Check Vercel environment variables and Supabase connection.</p>
-          </div>
-        </body>
-      </html>
+      <div style={{ padding: "4rem 2rem", fontFamily: "monospace", maxWidth: 600, margin: "0 auto" }}>
+        <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Database Error</h1>
+        <p style={{ color: "#ef4444", padding: "1rem", background: "#fef2f2", borderRadius: "0.5rem" }}>{dbError}</p>
+        <p style={{ color: "#666", marginTop: "1rem" }}>Check Vercel environment variables and Supabase connection status.</p>
+      </div>
     )
   }
 
