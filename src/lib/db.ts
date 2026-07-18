@@ -4,10 +4,15 @@ let pool: Pool | null = null
 
 function getPool(): Pool {
   if (pool) return pool
-  const connString = (process.env.POSTGRES_URL || "").replace(
-    /([?&])sslmode=[^&]*/g,
-    "$1sslmode=no-verify"
-  )
+  let connString = process.env.POSTGRES_URL || ""
+
+  if (process.env.NODE_ENV === "development") {
+    connString = connString.replace(
+      /([?&])sslmode=[^&]*/g,
+      "$1sslmode=no-verify"
+    )
+  }
+
   pool = new Pool({
     connectionString: connString,
     max: 5,
