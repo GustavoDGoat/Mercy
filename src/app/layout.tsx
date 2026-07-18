@@ -24,7 +24,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { seedDatabase } = await import("@/lib/seed")
+  const [{ migrate }, { seedDatabase }] = await Promise.all([
+    import("@/lib/migrate"),
+    import("@/lib/seed"),
+  ])
+  await migrate()
   await seedDatabase()
 
   return (

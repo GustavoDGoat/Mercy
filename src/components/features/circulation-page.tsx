@@ -205,7 +205,7 @@ export function CirculationPage() {
     setSaving(true)
     setError("")
     try {
-      const result = await approveRequest(req.id, parseInt(approveDuration) || req.durationDays)
+      const result = await approveRequest(req.id as string, parseInt(approveDuration) || (req.durationDays as number))
       if (result && "error" in result) {
         setError(result.error as string)
         return
@@ -223,7 +223,7 @@ export function CirculationPage() {
     setSaving(true)
     setError("")
     try {
-      await rejectRequest(selectedRequest.id, rejectReason)
+      await rejectRequest(selectedRequest.id as string, rejectReason)
       setRejectDialogOpen(false)
       setSelectedRequest(null)
       setRejectReason("")
@@ -616,23 +616,21 @@ export function CirculationPage() {
                 </TableHeader>
                 <TableBody>
                   {requests.map((req) => (
-                    <TableRow key={req.id}>
+                    <TableRow key={req.id as string}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{req.memberName}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{req.memberMatric}</p>
-                          <p className="text-xs text-muted-foreground">{req.studentEmail}</p>
+                          <p className="font-medium">{req.memberName as string}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{req.memberMatric as string}</p>
+                          <p className="text-xs text-muted-foreground">{req.studentEmail as string}</p>
                         </div>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate font-medium">
-                        {req.bookTitle}
+                        {req.bookTitle as string}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Select value={approveDuration} onValueChange={(v) => setApproveDuration(v ?? "14")}>
-                            <SelectTrigger className="w-20 h-7 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger className="w-20 h-7 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="7">7 days</SelectItem>
                               <SelectItem value="14">14 days</SelectItem>
@@ -640,16 +638,16 @@ export function CirculationPage() {
                               <SelectItem value="30">30 days</SelectItem>
                             </SelectContent>
                           </Select>
-                          <span className="text-xs text-muted-foreground">(req: {req.durationDays}d)</span>
+                          <span className="text-xs text-muted-foreground">(req: {req.durationDays as number}d)</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={req.format === "digital" ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"}>
-                          {req.format}
+                          {req.format as string}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {format(new Date(req.createdAt), "MMM d, h:mm a")}
+                        {format(new Date(req.createdAt as string), "MMM d, h:mm a")}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -685,7 +683,7 @@ export function CirculationPage() {
           <DialogHeader>
             <DialogTitle>Reject Borrow Request</DialogTitle>
             <DialogDescription>
-              Provide a reason for rejecting {selectedRequest?.memberName}&apos;s request for &quot;{selectedRequest?.bookTitle}&quot;.
+              Provide a reason for rejecting {selectedRequest?.memberName as string}&apos;s request for &quot;{selectedRequest?.bookTitle as string}&quot;.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

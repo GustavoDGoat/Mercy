@@ -123,7 +123,7 @@ export function MembersPage() {
     setError("")
     try {
       if (editingMember) {
-        await updateMember(editingMember.id, form)
+        await updateMember(editingMember.id, { ...form })
       } else {
         const result = await createMember(form)
         if (result && "error" in result) setError(result.error as string)

@@ -1,0 +1,66 @@
+import { sql, execute, querySingle } from "./db"
+
+let migrated = false
+
+export async function migrate(): Promise<void> {
+  if (migrated) return
+
+  const lock = await querySingle<{ locked: boolean }>`
+    SELECT pg_try_advisory_lock(987654321) as locked
+  `
+
+  if (!lock?.locked) {
+    await new Promise((r) => setTimeout(r, 2000))
+    migrated = true
+    return
+  }
+
+  try {
+    const row = await querySingle<{ exists: boolean }>`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables WHERE table_name = 'users'
+      ) as exists
+    `
+
+    if (row?.exists) {
+      migrated = true
+      return
+    }
+
+    await execute`
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
+        first_name TEXT NOT NULL, last_name TEXT NOT NULL, role TEXT NOT NULL,
+        member_id TEXT, fingerprint_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await execute`
+      CREATE TABLE members (
+        id TEXT PRIMARY KEY, user_id TEXT, first_name TEXT NOT NULL, last_name TEXT NOT NULL,
+        email TEXT NOT NULL, phone TEXT, matric_number TEXT UNIQUE NOT NULL,
+        department TEXT, faculty TEXT, level TEXT, max_borrow_limit INTEGER DEFAULT 4,
+        status TEXT DEFAULT 'active', registered_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await execute`
+      CREATE TABLE books (
+        id TEXT PRIMARY KEY, isbn TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL,
+        publisher TEXT, year_published INTEGER, edition TEXT, category TEXT, shelf_location TEXT,
+        total_copies INTEGER DEFAULT 1, available_copies INTEGER DEFAULT 1, rfid_tag_id TEXT UNIQUE,
+        pdf_url TEXT, cover_image TEXT, description TEXT, status TEXT DEFAULT 'available',
+        created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await execute`CREATE TABLE rfid_tags (id TEXT PRIMARY KEY, tag_id TEXT UNIQUE NOT NULL, book_id TEXT, is_active BOOLEAN DEFAULT true, last_scanned_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW())`
+    await execute`CREATE TABLE transactions (id TEXT PRIMARY KEY, book_id TEXT, member_id TEXT, issued_by TEXT, issue_date TIMESTAMPTZ NOT NULL, due_date TIMESTAMPTZ NOT NULL, return_date TIMESTAMPTZ, fine_amount NUMERIC DEFAULT 0, fine_paid BOOLEAN DEFAULT false, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`
+    await execute`CREATE TABLE borrow_requests (id TEXT PRIMARY KEY, book_id TEXT, member_id TEXT, requested_by TEXT, duration_days INTEGER NOT NULL, format TEXT NOT NULL, status TEXT DEFAULT 'pending', approved_by TEXT, approved_duration INTEGER, rejection_reason TEXT, transaction_id TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`
+    await execute`CREATE TABLE notifications (id TEXT PRIMARY KEY, user_id TEXT, type TEXT NOT NULL, title TEXT NOT NULL, message TEXT, related_id TEXT, read BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT NOW())`
+    await execute`CREATE TABLE audit_log (id TEXT PRIMARY KEY, user_id TEXT, action TEXT NOT NULL, details TEXT, ip_address TEXT, timestamp TIMESTAMPTZ DEFAULT NOW(), hash TEXT NOT NULL, previous_hash TEXT NOT NULL)`
+    await execute`CREATE TABLE rfid_gate_events (id TEXT PRIMARY KEY, book_id TEXT, book_title TEXT, tag_id TEXT, member_id TEXT, authorized BOOLEAN, triggered_at TIMESTAMPTZ DEFAULT NOW())`
+
+    migrated = true
+  } finally {
+    await execute`SELECT pg_advisory_unlock(987654321)`
+  }
+}

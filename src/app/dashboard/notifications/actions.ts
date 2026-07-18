@@ -16,12 +16,12 @@ export async function fetchUnreadCount() {
 
 export async function readNotification(id: string) {
   await requireAuth()
-  markAsRead(id)
+  await markAsRead(id)
   revalidatePath("/dashboard")
 }
 
 export async function readAllNotifications() {
   const session = await requireAuth()
-  markAllAsRead(session.userId)
+  await markAllAsRead(session.userId)
   revalidatePath("/dashboard")
 }

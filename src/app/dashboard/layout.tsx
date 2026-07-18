@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth"
 import { validateAndClearSession } from "./session"
-import db from "@/lib/db"
+import { querySingle } from "@/lib/db"
 import { ThemeProvider } from "@/hooks/use-theme"
 import { DashboardShell } from "@/components/layout/dashboard-shell"
 
@@ -16,7 +16,9 @@ export default async function DashboardLayout({
     redirect("/login")
   }
 
-  const user = db.users[session.userId]
+  const user = await querySingle<Record<string, unknown>>`
+    SELECT first_name, last_name, email, role FROM users WHERE id = ${session.userId}
+  `
   if (!user) {
     await validateAndClearSession()
     redirect("/login")
@@ -25,9 +27,9 @@ export default async function DashboardLayout({
   return (
     <ThemeProvider>
       <DashboardShell
-        userRole={user.role}
-        userName={`${user.firstName} ${user.lastName}`}
-        userEmail={user.email}
+        userRole={user.role as string}
+        userName={`${user.first_name} ${user.last_name}`}
+        userEmail={user.email as string}
       >
         {children}
       </DashboardShell>

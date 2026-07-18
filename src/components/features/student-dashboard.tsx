@@ -121,7 +121,7 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
 
   function getApprovedRequest(bookId: string) {
     const activeLoan = transactions.find((t) => t.bookId === bookId && t.status === "active")
-    if (activeLoan) return { daysLeft: Math.max(0, Math.ceil((new Date(activeLoan.dueDate).getTime() - Date.now()) / 86400000)) }
+    if (activeLoan) return { daysLeft: Math.max(0, Math.ceil((new Date(activeLoan.dueDate as string).getTime() - Date.now()) / 86400000)) }
     return null
   }
 

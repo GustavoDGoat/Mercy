@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getAuditLog } from "@/lib/audit"
+import { fetchAuditLog, fetchAuditIntegrity } from "@/app/dashboard/audit/actions"
 import type { AuditAction, AuditEntry } from "@/types"
 import { format } from "date-fns"
 
@@ -65,10 +65,12 @@ export function AuditPage() {
 
   async function loadData() {
     try {
-      const { verifyAuditIntegrity } = await import("@/lib/audit")
-      const log = getAuditLog(200)
+      const [log, verifyResult] = await Promise.all([
+        fetchAuditLog(),
+        fetchAuditIntegrity(),
+      ])
       setEntries(log)
-      setIntegrity(verifyAuditIntegrity())
+      setIntegrity(verifyResult)
     } catch {
       void 0
     } finally {
