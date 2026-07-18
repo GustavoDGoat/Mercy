@@ -12,7 +12,7 @@ function getPool(): Pool {
     connectionString: connString,
     max: 5,
     idleTimeoutMillis: 60000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 15000,
   })
   return pool
 }

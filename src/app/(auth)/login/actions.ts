@@ -46,6 +46,11 @@ export async function verifyMfa(userId: string) {
     path: "/",
   })
 
-  await createAuditEntry(row.id as string, "login", `User ${row.email} logged in with MFA`)
+  try {
+    await createAuditEntry(row.id as string, "login", `User ${row.email} logged in with MFA`)
+  } catch (e) {
+    console.error("[MFA] Audit entry failed (non-blocking):", e)
+  }
+
   return { success: true }
 }

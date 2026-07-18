@@ -7,7 +7,11 @@ import { createAuditEntry } from "@/lib/audit"
 export async function logout() {
   const session = await getSession()
   if (session) {
-    await createAuditEntry(session.userId, "logout", `User ${session.email} logged out`)
+    try {
+      await createAuditEntry(session.userId, "logout", `User ${session.email} logged out`)
+    } catch (e) {
+      console.error("[Logout] Audit entry failed (non-blocking):", e)
+    }
   }
 
   const cookieStore = await cookies()
