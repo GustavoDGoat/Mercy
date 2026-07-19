@@ -10,10 +10,12 @@ export async function migrate(): Promise<void> {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
         first_name TEXT NOT NULL, last_name TEXT NOT NULL, role TEXT NOT NULL,
-        member_id TEXT, fingerprint_hash TEXT NOT NULL,
+        member_id TEXT, fingerprint_hash TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `
+    await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_template TEXT`
+    await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_platform TEXT`
     await execute`
       CREATE TABLE IF NOT EXISTS members (
         id TEXT PRIMARY KEY, user_id TEXT, first_name TEXT NOT NULL, last_name TEXT NOT NULL,

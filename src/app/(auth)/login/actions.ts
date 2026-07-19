@@ -15,14 +15,20 @@ function signToken(payload: TokenPayload): string {
 
 export async function login(email: string, password: string) {
   const row = await querySingle<Record<string, unknown>>`
-    SELECT id, email, password_hash FROM users WHERE email = ${email}
+    SELECT id, email, password_hash, fingerprint_template, fingerprint_platform
+    FROM users WHERE email = ${email}
   `
   if (!row) return { error: "Invalid email or password" }
 
   const valid = await bcrypt.compare(password, row.password_hash as string)
   if (!valid) return { error: "Invalid email or password" }
 
-  return { userId: row.id as string }
+  return {
+    userId: row.id as string,
+    hasFingerprint: !!(row.fingerprint_template),
+    fingerprintTemplate: (row.fingerprint_template as string) || null,
+    fingerprintPlatform: (row.fingerprint_platform as string) || null,
+  }
 }
 
 export async function verifyMfa(userId: string) {

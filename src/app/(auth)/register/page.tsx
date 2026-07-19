@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Loader2, Shield, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Loader2, Shield, CheckCircle, Fingerprint, WifiOff, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,7 +12,10 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import { registerStudent } from "./actions"
+import { registerStudent, storeFingerprint } from "./actions"
+import { checkScannerStatus, enrollFingerprint, type ScannerStatus } from "@/lib/fingerprint"
+
+type EnrollState = "checking" | "no_scanner" | "ready" | "scanning" | "success" | "error"
 
 interface FormData {
   firstName: string; lastName: string; email: string; password: string
@@ -44,7 +47,11 @@ export default function RegisterPage() {
   const [form, setForm] = useState<FormData>(empty)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState(false)
+  const [step, setStep] = useState<"form" | "enroll" | "done">("form")
+  const [userId, setUserId] = useState<string | null>(null)
+  const [enrollState, setEnrollState] = useState<EnrollState>("checking")
+  const [enrollError, setEnrollError] = useState("")
+  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>({ connected: false })
   const [showPassword, setShowPassword] = useState(false)
 
   function update(field: keyof FormData, value: string) {
@@ -80,12 +87,73 @@ export default function RegisterPage() {
         setError(result.error as string)
         return
       }
-      setSuccess(true)
+      setUserId(result.userId!)
+      setStep("enroll")
     } catch {
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    if (step !== "enroll") return
+    let cancelled = false
+
+    async function init() {
+      setEnrollState("checking")
+      const status = await checkScannerStatus()
+      if (cancelled) return
+      setScannerStatus(status)
+      if (!status.connected) {
+        setEnrollState("no_scanner")
+        return
+      }
+      setEnrollState("ready")
+    }
+
+    init()
+    return () => { cancelled = true }
+  }, [step])
+
+  async function handleEnroll() {
+    if (enrollState !== "ready") return
+    setEnrollState("scanning")
+    setEnrollError("")
+
+    try {
+      const result = await enrollFingerprint()
+      if (!result.template) {
+        setEnrollError("Enrollment failed: no template received")
+        setEnrollState("ready")
+        return
+      }
+
+      const stored = await storeFingerprint(userId!, result.template, result.platform)
+      if (stored && "error" in stored) {
+        setEnrollError(stored.error as string)
+        setEnrollState("ready")
+        return
+      }
+
+      setEnrollState("success")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Enrollment failed"
+      setEnrollError(msg)
+      setEnrollState("ready")
+    }
+  }
+
+  async function handleRetryScanner() {
+    setEnrollState("checking")
+    setEnrollError("")
+    const status = await checkScannerStatus()
+    setScannerStatus(status)
+    if (!status.connected) {
+      setEnrollState("no_scanner")
+      return
+    }
+    setEnrollState("ready")
   }
 
   const required =
@@ -94,7 +162,7 @@ export default function RegisterPage() {
     form.lga && form.address && form.matricNumber && form.department &&
     form.faculty && form.nin
 
-  if (success) {
+  if (step === "done") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-2xl border-2 border-accent/20">
@@ -102,18 +170,121 @@ export default function RegisterPage() {
             <div className="mx-auto w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <CardTitle className="text-2xl font-bold text-primary">Registration Successful!</CardTitle>
+            <CardTitle className="text-2xl font-bold text-primary">Registration Complete!</CardTitle>
             <CardDescription className="text-base">
-              Your account has been created.
+              Your account and fingerprint have been set up.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <p className="text-sm text-muted-foreground">
-              You can now log in using <span className="font-medium">{form.email}</span> and your password.
+              You can now log in using <span className="font-medium">{form.email}</span> and your password, then scan your fingerprint.
             </p>
             <Button className="w-full" onClick={() => router.push("/login")}>
               Go to Login
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (step === "enroll") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-2xl border-2 border-accent/20">
+          <CardHeader className="text-center space-y-2">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
+              <Fingerprint className="w-8 h-8 text-accent" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-primary">Fingerprint Enrollment</CardTitle>
+            <CardDescription className="text-base">
+              {enrollState === "checking" && "Connecting to fingerprint scanner..."}
+              {enrollState === "no_scanner" && (scannerStatus.error || "Scanner not detected. Connect the USB scanner.")}
+              {enrollState === "ready" && !enrollError && "Place your finger on the scanner to register your fingerprint"}
+              {enrollState === "scanning" && "Scanning fingerprint. Keep your finger steady..."}
+              {enrollState === "success" && "Fingerprint enrolled successfully!"}
+              {enrollState === "error" && "Enrollment failed. Please try again."}
+              {enrollState === "ready" && enrollError && enrollError}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center space-y-6">
+            {enrollState === "checking" && (
+              <div className="mx-auto w-24 h-24 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-muted border-2 border-muted-foreground/20 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                </div>
+              </div>
+            )}
+
+            {enrollState === "no_scanner" && (
+              <div className="space-y-4">
+                <div className="mx-auto w-24 h-24 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-destructive/10 border-2 border-destructive flex items-center justify-center">
+                    <WifiOff className="w-8 h-8 text-destructive" />
+                  </div>
+                </div>
+                <Button onClick={handleRetryScanner} size="sm" variant="outline">
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            {(enrollState === "ready" || enrollState === "error") && (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={handleEnroll}
+                  className="relative mx-auto w-24 h-24 flex items-center justify-center"
+                >
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
+                    enrollState === "error"
+                      ? "bg-destructive/10 border-2 border-destructive"
+                      : "bg-muted border-2 border-muted-foreground/20 hover:border-accent/50 hover:scale-105 cursor-pointer"
+                  }`}>
+                    <Fingerprint className={`w-8 h-8 ${
+                      enrollState === "error" ? "text-destructive" : "text-muted-foreground"
+                    }`} />
+                  </div>
+                </button>
+                <p className="text-xs text-muted-foreground">Tap the fingerprint icon to begin scanning</p>
+              </div>
+            )}
+
+            {enrollState === "scanning" && (
+              <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-accent/20 animate-ping" />
+                <div className="z-10 w-20 h-20 rounded-full bg-accent/20 border-2 border-accent flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                </div>
+              </div>
+            )}
+
+            {enrollState === "success" && (
+              <div className="mx-auto w-24 h-24 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
+                  <Check className="w-8 h-8 text-green-500 animate-bounce" />
+                </div>
+              </div>
+            )}
+
+            <div>
+              {enrollState === "success" ? (
+                <Button className="w-full" onClick={() => setStep("done")}>
+                  Continue
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setStep("done")}
+                  size="sm"
+                >
+                  Skip fingerprint setup
+                </Button>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-2">
+                You can set up your fingerprint later through a librarian.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

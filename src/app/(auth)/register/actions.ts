@@ -22,12 +22,11 @@ export async function registerStudent(data: {
   const userId = crypto.randomUUID()
   const memberId = `SE-${Date.now().toString(36).toUpperCase()}`
   const passwordHash = await bcrypt.hash(data.password, 12)
-  const fingerprintHash = await bcrypt.hash(`fingerprint:${userId}`, 12)
   const now = new Date().toISOString()
 
   await execute`
-    INSERT INTO users (id, email, password_hash, first_name, last_name, role, member_id, fingerprint_hash, created_at, updated_at)
-    VALUES (${userId}, ${data.email}, ${passwordHash}, ${data.firstName}, ${data.lastName}, 'student', ${memberId}, ${fingerprintHash}, ${now}, ${now})
+    INSERT INTO users (id, email, password_hash, first_name, last_name, role, member_id, created_at, updated_at)
+    VALUES (${userId}, ${data.email}, ${passwordHash}, ${data.firstName}, ${data.lastName}, 'student', ${memberId}, ${now}, ${now})
   `
 
   await execute`
@@ -35,5 +34,26 @@ export async function registerStudent(data: {
     VALUES (${memberId}, ${userId}, ${data.firstName}, ${data.lastName}, ${data.email}, ${data.phone}, ${data.matricNumber}, ${data.department}, ${data.faculty}, ${data.level || "100L"}, ${data.age}, ${data.height || null}, ${data.weight || null}, ${data.religion || null}, ${data.state}, ${data.lga}, ${data.address}, ${data.nin}, 4, 'active', ${now}, ${now})
   `
 
-  return { success: true, email: data.email }
+  return { success: true, userId, email: data.email }
+}
+
+export async function storeFingerprint(
+  userId: string,
+  template: string,
+  platform: string
+) {
+  const user = await querySingle<{ id: string }>`
+    SELECT id FROM users WHERE id = ${userId}
+  `
+  if (!user) return { error: "User not found" }
+
+  await execute`
+    UPDATE users
+    SET fingerprint_template = ${template},
+        fingerprint_platform = ${platform},
+        updated_at = NOW()
+    WHERE id = ${userId}
+  `
+
+  return { success: true }
 }

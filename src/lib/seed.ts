@@ -22,8 +22,8 @@ export async function seedDatabase(): Promise<void> {
 
   const adminHash = await hashPassword("admin123")
   await execute`
-    INSERT INTO users (id, email, password_hash, first_name, last_name, role, fingerprint_hash, created_at, updated_at)
-    VALUES (${adminId}, ${"admin@lautech.edu.ng"}, ${adminHash}, ${"Admin"}, ${"User"}, ${"admin"}, ${await hashPassword(`fingerprint:${adminId}`)}, ${now}, ${now})
+    INSERT INTO users (id, email, password_hash, first_name, last_name, role, created_at, updated_at)
+    VALUES (${adminId}, ${"admin@lautech.edu.ng"}, ${adminHash}, ${"Admin"}, ${"User"}, ${"admin"}, ${now}, ${now})
   `
 
   const copies = 5

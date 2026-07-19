@@ -1,13 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Fingerprint, Loader2, Shield } from "lucide-react"
+import { Eye, EyeOff, Fingerprint, Loader2, Shield, Check, X, Wifi, WifiOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { login, verifyMfa } from "./actions"
+import { checkScannerStatus, verifyFingerprint, type ScannerStatus } from "@/lib/fingerprint"
+
+type MfaState = "checking" | "no_scanner" | "no_fingerprint" | "platform_mismatch" | "ready" | "scanning" | "match" | "no_match" | "locked"
+
+const MAX_ATTEMPTS = 3
+const LOCKOUT_MS = 5 * 60 * 1000
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,8 +23,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [scanState, setScanState] = useState<"idle" | "scanning" | "success" | "error">("idle")
   const [userId, setUserId] = useState<string | null>(null)
+  const [fpTemplate, setFpTemplate] = useState<string | null>(null)
+  const [fpPlatform, setFpPlatform] = useState<string | null>(null)
+  const [mfaState, setMfaState] = useState<MfaState>("checking")
+  const [attempts, setAttempts] = useState(0)
+  const [lockoutUntil, setLockoutUntil] = useState(0)
+  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>({ connected: false })
 
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault()
@@ -32,6 +43,13 @@ export default function LoginPage() {
         return
       }
       setUserId(result.userId!)
+      if (!result.hasFingerprint || !result.fingerprintTemplate) {
+        setMfaState("no_fingerprint")
+        setStep("mfa")
+        return
+      }
+      setFpTemplate(result.fingerprintTemplate)
+      setFpPlatform(result.fingerprintPlatform)
       setStep("mfa")
     } catch {
       setError("An unexpected error occurred")
@@ -40,25 +58,121 @@ export default function LoginPage() {
     }
   }
 
-  async function handleFingerprintScan() {
-    if (!userId || scanState !== "idle") return
-    setScanState("scanning")
+  useEffect(() => {
+    if (step !== "mfa") return
+    if (mfaState === "no_fingerprint") return
 
-    await new Promise((r) => setTimeout(r, 1800))
-    setScanState("success")
+    let cancelled = false
 
-    await new Promise((r) => setTimeout(r, 600))
-    try {
-      const result = await verifyMfa(userId)
-      if (result.error) {
-        setError(result.error)
-        setScanState("error")
+    async function initScanner() {
+      setMfaState("checking")
+      const status = await checkScannerStatus()
+      if (cancelled) return
+      setScannerStatus(status)
+
+      if (!status.connected) {
+        setMfaState("no_scanner")
         return
       }
-      router.push("/dashboard")
-    } catch {
-      setError("Authentication failed")
-      setScanState("error")
+
+      if (fpPlatform && status.platform && fpPlatform !== status.platform) {
+        setMfaState("platform_mismatch")
+        return
+      }
+
+      setMfaState("ready")
+    }
+
+    initScanner()
+    return () => { cancelled = true }
+  }, [step])
+
+  useEffect(() => {
+    if (attempts >= MAX_ATTEMPTS) {
+      const until = Date.now() + LOCKOUT_MS
+      setLockoutUntil(until)
+      setMfaState("locked")
+      const timer = setTimeout(() => {
+        setAttempts(0)
+        setLockoutUntil(0)
+        setMfaState("ready")
+        setError("")
+      }, LOCKOUT_MS)
+      return () => clearTimeout(timer)
+    }
+  }, [attempts])
+
+  async function handleFingerprintScan() {
+    if (!userId || !fpTemplate || !fpPlatform) return
+    if (mfaState === "locked" || mfaState === "scanning" || mfaState === "match") return
+
+    setMfaState("scanning")
+    setError("")
+
+    try {
+      const result = await verifyFingerprint(fpTemplate, fpPlatform)
+      if (result.match) {
+        setMfaState("match")
+        await new Promise((r) => setTimeout(r, 800))
+        const mfaResult = await verifyMfa(userId)
+        if (mfaResult.error) {
+          setError(mfaResult.error)
+          setMfaState("ready")
+          return
+        }
+        router.push("/dashboard")
+      } else {
+        const newAttempts = attempts + 1
+        setAttempts(newAttempts)
+        if (newAttempts < MAX_ATTEMPTS) {
+          setMfaState("no_match")
+          setError(`Fingerprint does not match. Attempt ${newAttempts} of ${MAX_ATTEMPTS}.`)
+          setTimeout(() => {
+            setMfaState("ready")
+            setError("")
+          }, 1500)
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Fingerprint verification failed"
+      setError(msg)
+      setMfaState("ready")
+    }
+  }
+
+  function handleRetryScanner() {
+    if (step !== "mfa") return
+    let cancelled = false
+    async function retry() {
+      setMfaState("checking")
+      const status = await checkScannerStatus()
+      if (cancelled) return
+      setScannerStatus(status)
+      if (!status.connected) {
+        setMfaState("no_scanner")
+        return
+      }
+      if (fpPlatform && status.platform && fpPlatform !== status.platform) {
+        setMfaState("platform_mismatch")
+        return
+      }
+      setMfaState("ready")
+    }
+    retry()
+    return () => { cancelled = true }
+  }
+
+  function getMfaMessage(): string {
+    switch (mfaState) {
+      case "checking": return "Connecting to fingerprint scanner..."
+      case "no_scanner": return scannerStatus.error || "Scanner not detected. Ensure the USB scanner is connected."
+      case "no_fingerprint": return "No fingerprint registered. Please contact a librarian to enroll your fingerprint."
+      case "platform_mismatch": return `Your fingerprint was registered on a '${fpPlatform}' kiosk. Please use the same type of kiosk.`
+      case "ready": return "Place your finger on the scanner"
+      case "scanning": return "Reading fingerprint..."
+      case "match": return "Identity verified! Redirecting..."
+      case "no_match": return ""
+      case "locked": return `Too many failed attempts. Try again in ${Math.ceil((lockoutUntil - Date.now()) / 1000 / 60)} minute(s).`
     }
   }
 
@@ -144,56 +258,92 @@ export default function LoginPage() {
               <div>
                 <p className="font-semibold text-lg text-primary">Biometric Verification</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Place your finger on the scanner to verify your identity
+                  {getMfaMessage()}
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleFingerprintScan}
-                disabled={scanState !== "idle"}
-                className="relative mx-auto w-24 h-24 flex items-center justify-center"
-              >
-                <div
-                  className={`absolute inset-0 rounded-full ${
-                    scanState === "scanning"
-                      ? "bg-accent/20 animate-ping"
-                      : scanState === "success"
-                      ? "bg-green-500/20"
-                      : scanState === "error"
-                      ? "bg-destructive/20"
-                      : ""
-                  }`}
-                />
-                <div
-                  className={`relative z-10 w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
-                    scanState === "scanning"
-                      ? "bg-accent/20 border-2 border-accent scale-110"
-                      : scanState === "success"
-                      ? "bg-green-500/20 border-2 border-green-500"
-                      : scanState === "error"
-                      ? "bg-destructive/20 border-2 border-destructive"
-                      : "bg-muted border-2 border-muted-foreground/20 hover:border-accent/50"
-                  }`}
-                >
-                  {scanState === "scanning" ? (
+              {mfaState === "checking" && (
+                <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-muted border-2 border-muted-foreground/20 flex items-center justify-center">
                     <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                  ) : scanState === "success" ? (
-                    <Fingerprint className="w-8 h-8 text-green-500 animate-bounce" />
-                  ) : (
-                    <Fingerprint className="w-8 h-8 text-muted-foreground" />
-                  )}
+                  </div>
                 </div>
-              </button>
+              )}
 
-              <p className="text-xs text-muted-foreground">
-                {scanState === "idle" && "Tap the fingerprint icon to scan"}
-                {scanState === "scanning" && "Scanning fingerprint..."}
-                {scanState === "success" && "Fingerprint verified! Redirecting..."}
-                {scanState === "error" && "Verification failed. Please try again."}
-              </p>
+              {mfaState === "no_scanner" && (
+                <div className="space-y-4">
+                  <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                    <div className="w-20 h-20 rounded-full bg-destructive/10 border-2 border-destructive flex items-center justify-center">
+                      <WifiOff className="w-8 h-8 text-destructive" />
+                    </div>
+                  </div>
+                  <Button onClick={handleRetryScanner} size="sm" variant="outline">
+                    <Wifi className="w-4 h-4 mr-2" /> Retry
+                  </Button>
+                </div>
+              )}
 
-              {error && (
+              {mfaState === "no_fingerprint" && (
+                <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-yellow-500/10 border-2 border-yellow-500 flex items-center justify-center">
+                    <Fingerprint className="w-8 h-8 text-yellow-500" />
+                  </div>
+                </div>
+              )}
+
+              {mfaState === "platform_mismatch" && (
+                <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-yellow-500/10 border-2 border-yellow-500 flex items-center justify-center">
+                    <X className="w-8 h-8 text-yellow-500" />
+                  </div>
+                </div>
+              )}
+
+              {(mfaState === "ready" || mfaState === "no_match" || mfaState === "locked") && (
+                <button
+                  type="button"
+                  onClick={handleFingerprintScan}
+                  disabled={mfaState === "locked"}
+                  className="relative mx-auto w-24 h-24 flex items-center justify-center"
+                >
+                  <div
+                    className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
+                      mfaState === "no_match"
+                        ? "bg-destructive/10 border-2 border-destructive"
+                        : mfaState === "locked"
+                        ? "bg-destructive/10 border-2 border-destructive"
+                        : "bg-muted border-2 border-muted-foreground/20 hover:border-accent/50 hover:scale-105 cursor-pointer"
+                    }`}
+                  >
+                    <Fingerprint
+                      className={`w-8 h-8 ${
+                        mfaState === "no_match" ? "text-destructive" :
+                        mfaState === "locked" ? "text-destructive" :
+                        "text-muted-foreground"
+                      }`}
+                    />
+                  </div>
+                </button>
+              )}
+
+              {mfaState === "scanning" && (
+                <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-accent/20 animate-ping" />
+                  <div className="z-10 w-20 h-20 rounded-full bg-accent/20 border-2 border-accent flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                  </div>
+                </div>
+              )}
+
+              {mfaState === "match" && (
+                <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500 flex items-center justify-center">
+                    <Check className="w-8 h-8 text-green-500 animate-bounce" />
+                  </div>
+                </div>
+              )}
+
+              {error && mfaState !== "checking" && mfaState !== "no_match" && (
                 <p className="text-sm text-destructive bg-destructive/10 py-2 rounded">
                   {error}
                 </p>
@@ -205,9 +355,11 @@ export default function LoginPage() {
                 size="sm"
                 onClick={() => {
                   setStep("credentials")
-                  setScanState("idle")
+                  setMfaState("checking")
                   setError("")
                   setPassword("")
+                  setAttempts(0)
+                  setLockoutUntil(0)
                 }}
               >
                 Back to sign in
