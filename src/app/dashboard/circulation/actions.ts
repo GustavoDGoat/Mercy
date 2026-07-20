@@ -16,8 +16,12 @@ export async function getTransactions(search?: string, status?: string) {
   const params: unknown[] = []
 
   if (status && status !== "all") {
-    where += ` AND t.status = $${params.length + 1}`
-    params.push(status)
+    if (status === "due_soon") {
+      where += ` AND t.status = 'active' AND t.due_date BETWEEN NOW() AND NOW() + INTERVAL '3 days'`
+    } else {
+      where += ` AND t.status = $${params.length + 1}`
+      params.push(status)
+    }
   }
 
   const txQuery = `
@@ -67,9 +71,11 @@ export async function getMemberLoans(memberId: string) {
   await requireAuth()
 
   const rows = await sql<Record<string, unknown>>`
-    SELECT t.*, b.title as book_title, b.author as book_author, b.pdf_url as book_pdf_url
+    SELECT t.*, b.title as book_title, b.author as book_author, b.pdf_url as book_pdf_url,
+           br.format as borrow_format
     FROM transactions t
     JOIN books b ON t.book_id = b.id
+    LEFT JOIN borrow_requests br ON br.transaction_id = t.id
     WHERE t.member_id = ${memberId}
     ORDER BY t.issue_date DESC
   `
@@ -81,6 +87,7 @@ export async function getMemberLoans(memberId: string) {
     status: r.status as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string,
     bookTitle: (r.book_title as string) || "Unknown", bookAuthor: (r.book_author as string) || "",
     bookPdfUrl: (r.book_pdf_url as string) || null,
+    format: (r.borrow_format as string) || null,
   }))
 }
 

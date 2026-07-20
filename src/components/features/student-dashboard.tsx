@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { BookOpen, BookCopy, Clock, AlertTriangle, Loader2, Monitor, CalendarDays } from "lucide-react"
+import { BookOpen, BookCopy, Clock, AlertTriangle, Loader2, Monitor, CalendarDays, Package, MonitorIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,6 +74,29 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
   useEffect(() => {
     loadRequests()
   }, [])
+
+  const loadTransactions = useCallback(async () => {
+    if (!user.memberId) return
+    try {
+      const data = await getMemberLoans(user.memberId)
+      setTransactions(data)
+    } catch { /* silently fail — keep existing data */ }
+  }, [user.memberId])
+
+  useEffect(() => {
+    if (!user.memberId) return
+    loadTransactions()
+
+    const interval = setInterval(loadTransactions, 30000)
+
+    const onFocus = () => { loadTransactions() }
+    window.addEventListener("focus", onFocus)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener("focus", onFocus)
+    }
+  }, [loadTransactions])
 
   function openBorrow(book: (typeof books)[number]) {
     setSelectedBook(book)
@@ -201,9 +224,9 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
                 <TableHeader>
                   <TableRow>
                     <TableHead>Book</TableHead>
+                    <TableHead>Format</TableHead>
                     <TableHead>Issue Date</TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead>Days Left</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Fine</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -216,22 +239,42 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
                     const daysLeft = tx.status === "active"
                       ? Math.max(0, Math.ceil((new Date(tx.dueDate).getTime() - Date.now()) / 86400000))
                       : 0
+                    const isDueSoon = tx.status === "active" && daysLeft > 0 && daysLeft <= 3 && !isOverdue
+                    const txFormat = (tx as Record<string, unknown>).format as string | null
 
                     return (
-                      <TableRow key={tx.id} className={isOverdue ? "bg-destructive/5" : ""}>
+                      <TableRow key={tx.id} className={isOverdue ? "bg-destructive/5" : isDueSoon ? "bg-amber-50 dark:bg-amber-950/20" : ""}>
                         <TableCell className="font-medium">{book?.title || "Unknown"}</TableCell>
+                        <TableCell>
+                          {txFormat === "digital" ? (
+                            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                              <MonitorIcon className="w-3 h-3 mr-1" />Digital
+                            </Badge>
+                          ) : txFormat === "physical" ? (
+                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                              <Package className="w-3 h-3 mr-1" />Physical
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-gray-100 text-gray-800">
+                              <Package className="w-3 h-3 mr-1" />Physical
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm">{new Date(tx.issueDate).toLocaleDateString()}</TableCell>
                         <TableCell className="text-sm">
-                          <span className={isOverdue ? "text-destructive font-medium" : ""}>
-                            {new Date(tx.dueDate).toLocaleDateString()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {tx.status === "active" ? (
-                            <span className={daysLeft <= 3 ? "text-destructive font-medium" : ""}>
-                              {daysLeft} days
+                          <div>
+                            <span className={isOverdue ? "text-destructive font-medium" : isDueSoon ? "text-amber-600 font-medium" : ""}>
+                              {new Date(tx.dueDate).toLocaleDateString()}
                             </span>
-                          ) : "—"}
+                            {tx.status === "active" && !isOverdue && (
+                              <p className={`text-xs ${isDueSoon ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+                                {daysLeft === 0 ? "Due today" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}
+                              </p>
+                            )}
+                            {isOverdue && (
+                              <p className="text-xs text-destructive font-medium">Overdue</p>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge className={statusColors[tx.status] || ""}>

@@ -363,6 +363,7 @@ export function CirculationPage() {
           <SelectContent>
             <SelectItem value="all">All Transactions</SelectItem>
             <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="due_soon">Due Soon (3 days)</SelectItem>
             <SelectItem value="overdue">Overdue</SelectItem>
             <SelectItem value="returned">Returned</SelectItem>
           </SelectContent>
