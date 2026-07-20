@@ -2,6 +2,7 @@
 
 import bcrypt from "bcryptjs"
 import { querySingle, execute } from "@/lib/db"
+import { encryptTemplate } from "@/lib/encryption"
 
 export async function registerStudent(data: {
   email: string; password: string; firstName: string; lastName: string
@@ -40,17 +41,29 @@ export async function registerStudent(data: {
 export async function storeFingerprint(
   userId: string,
   template: string,
-  platform: string
+  platform: string,
+  sdkVersion?: string,
+  scannerModel?: string
 ) {
   const user = await querySingle<{ id: string }>`
     SELECT id FROM users WHERE id = ${userId}
   `
   if (!user) return { error: "User not found" }
 
+  let encrypted: string
+  try {
+    encrypted = encryptTemplate(template)
+  } catch (e: unknown) {
+    return { error: `Template encryption failed: ${(e as Error).message}` }
+  }
+
   await execute`
     UPDATE users
-    SET fingerprint_template = ${template},
+    SET fingerprint_template_encrypted = ${encrypted},
         fingerprint_platform = ${platform},
+        fingerprint_sdk_version = ${sdkVersion || null},
+        fingerprint_scanner_model = ${scannerModel || null},
+        fingerprint_enrolled_at = NOW(),
         updated_at = NOW()
     WHERE id = ${userId}
   `

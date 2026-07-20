@@ -16,6 +16,10 @@ export async function migrate(): Promise<void> {
     `
     await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_template TEXT`
     await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_platform TEXT`
+    await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_template_encrypted TEXT`
+    await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_sdk_version TEXT`
+    await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_scanner_model TEXT`
+    await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_enrolled_at TIMESTAMPTZ`
     await execute`
       CREATE TABLE IF NOT EXISTS members (
         id TEXT PRIMARY KEY, user_id TEXT, first_name TEXT NOT NULL, last_name TEXT NOT NULL,

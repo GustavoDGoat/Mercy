@@ -29,9 +29,12 @@ export interface User {
   lastName: string
   role: UserRole
   memberId?: string
-  fingerprintHash?: string
   fingerprintTemplate?: string
   fingerprintPlatform?: string
+  fingerprintTemplateEncrypted?: string
+  fingerprintSdkVersion?: string
+  fingerprintScannerModel?: string
+  fingerprintEnrolledAt?: string
   createdAt: string
   updatedAt: string
 }

@@ -51,7 +51,13 @@ export default function RegisterPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [enrollState, setEnrollState] = useState<EnrollState>("checking")
   const [enrollError, setEnrollError] = useState("")
-  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>({ connected: false })
+  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>({
+    connected: false,
+    mode: "unknown",
+    state: "offline",
+    device: { name: "", vendor_id: "", product_id: "", serial: "", driver_version: "", sdk_version: "" },
+    uptime_seconds: 0,
+  })
   const [showPassword, setShowPassword] = useState(false)
 
   function update(field: keyof FormData, value: string) {
@@ -129,7 +135,13 @@ export default function RegisterPage() {
         return
       }
 
-      const stored = await storeFingerprint(userId!, result.template, result.platform)
+      const stored = await storeFingerprint(
+        userId!,
+        result.template,
+        result.platform,
+        scannerStatus.device.sdk_version || undefined,
+        scannerStatus.device.name || undefined
+      )
       if (stored && "error" in stored) {
         setEnrollError(stored.error as string)
         setEnrollState("ready")

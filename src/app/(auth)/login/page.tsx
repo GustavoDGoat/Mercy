@@ -29,7 +29,13 @@ export default function LoginPage() {
   const [mfaState, setMfaState] = useState<MfaState>("checking")
   const [attempts, setAttempts] = useState(0)
   const [lockoutUntil, setLockoutUntil] = useState(0)
-  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>({ connected: false })
+  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>({
+    connected: false,
+    mode: "unknown",
+    state: "offline",
+    device: { name: "", vendor_id: "", product_id: "", serial: "", driver_version: "", sdk_version: "" },
+    uptime_seconds: 0,
+  })
 
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault()
@@ -75,7 +81,7 @@ export default function LoginPage() {
         return
       }
 
-      if (fpPlatform && status.platform && fpPlatform !== status.platform) {
+      if (fpPlatform && fpPlatform !== "win_dpsdk") {
         setMfaState("platform_mismatch")
         return
       }
@@ -114,7 +120,11 @@ export default function LoginPage() {
       if (result.match) {
         setMfaState("match")
         await new Promise((r) => setTimeout(r, 800))
-        const mfaResult = await verifyMfa(userId)
+        const mfaResult = await verifyMfa(
+          userId,
+          result.verification_token,
+          result.timestamp
+        )
         if (mfaResult.error) {
           setError(mfaResult.error)
           setMfaState("ready")
@@ -152,7 +162,7 @@ export default function LoginPage() {
         setMfaState("no_scanner")
         return
       }
-      if (fpPlatform && status.platform && fpPlatform !== status.platform) {
+      if (fpPlatform && fpPlatform !== "win_dpsdk") {
         setMfaState("platform_mismatch")
         return
       }
