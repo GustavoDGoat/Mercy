@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BookOpen, BookCopy, Clock, AlertTriangle, Loader2, Monitor, BookMarked, CalendarDays } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { BookOpen, BookCopy, Clock, AlertTriangle, Loader2, Monitor, CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,10 +56,9 @@ const requestStatusColors: Record<string, string> = {
 }
 
 export function StudentDashboard({ user, stats, books, transactions: initialTx }: PageData) {
+  const router = useRouter()
   const [borrowDialogOpen, setBorrowDialogOpen] = useState(false)
-  const [readDialogOpen, setReadDialogOpen] = useState(false)
   const [selectedBook, setSelectedBook] = useState<(typeof books)[number] | null>(null)
-  const [readingBook, setReadingBook] = useState<(typeof books)[number] | null>(null)
   const [duration, setDuration] = useState("14")
   const [format, setFormat] = useState<"digital" | "physical">("digital")
   const [saving, setSaving] = useState(false)
@@ -83,11 +83,6 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
     setBorrowDialogOpen(true)
   }
 
-  function openRead(book: (typeof books)[number]) {
-    setReadingBook(book)
-    setReadDialogOpen(true)
-  }
-
   async function handleRequestBorrow() {
     if (!selectedBook) return
     setSaving(true)
@@ -109,10 +104,6 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
     } finally {
       setSaving(false)
     }
-  }
-
-  function hasActiveLoan(bookId: string) {
-    return transactions.some((t) => t.bookId === bookId && t.status === "active")
   }
 
   function hasPendingRequest(bookId: string) {
@@ -247,8 +238,8 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
                         </TableCell>
                         <TableCell className="text-right">
                           {book?.pdfUrl && tx.status === "active" && (
-                            <Button variant="outline" size="sm" onClick={() => openRead(book)}>
-                              <BookMarked className="w-4 h-4" />Read
+                            <Button variant="outline" size="sm" onClick={() => router.push(`/books/read/${tx.id}`)}>
+                              <BookOpen className="w-4 h-4" />Continue Reading
                             </Button>
                           )}
                         </TableCell>
@@ -280,7 +271,8 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
                 </TableHeader>
                 <TableBody>
                   {books.map((book) => {
-                    const activeLoan = hasActiveLoan(book.id)
+                    const activeLoanTx = transactions.find((t) => t.bookId === book.id && t.status === "active")
+                    const activeLoan = activeLoanTx != null
                     const pending = hasPendingRequest(book.id)
                     const approvedInfo = getApprovedRequest(book.id)
 
@@ -312,9 +304,9 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {activeLoan && book.pdfUrl ? (
-                            <Button variant="outline" size="sm" onClick={() => openRead(book)}>
-                              <BookMarked className="w-4 h-4" />Read
+                          {activeLoanTx && book.pdfUrl ? (
+                            <Button variant="outline" size="sm" onClick={() => router.push(`/books/read/${activeLoanTx.id}`)}>
+                              <BookOpen className="w-4 h-4" />Continue Reading
                             </Button>
                           ) : !activeLoan && !pending && book.availableCopies > 0 ? (
                             <Button size="sm" onClick={() => openBorrow(book)}>
@@ -408,33 +400,6 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
             <Button onClick={handleRequestBorrow} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Request"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={readDialogOpen} onOpenChange={setReadDialogOpen}>
-        <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{readingBook?.title}</DialogTitle>
-            <DialogDescription>{readingBook?.author}</DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 min-h-0 rounded-lg overflow-hidden border bg-muted/30">
-            {readingBook?.pdfUrl ? (
-              <iframe
-                src={readingBook.pdfUrl}
-                className="w-full h-full"
-                title={readingBook.title}
-                sandbox="allow-scripts allow-same-origin"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <BookOpen className="w-12 h-12 mb-2 opacity-40" />
-                <p>No PDF available for this book</p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReadDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

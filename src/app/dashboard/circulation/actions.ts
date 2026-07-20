@@ -327,9 +327,9 @@ export async function getPendingRequests() {
       m.first_name as m_first, m.last_name as m_last, m.matric_number as m_matric,
       u.email as student_email
     FROM borrow_requests br
-    JOIN books b ON br.book_id = b.id
-    JOIN members m ON br.member_id = m.id
-    JOIN users u ON br.requested_by = u.id
+    LEFT JOIN books b ON br.book_id = b.id
+    LEFT JOIN members m ON br.member_id = m.id
+    LEFT JOIN users u ON br.requested_by = u.id
     WHERE br.status = 'pending'
     ORDER BY br.created_at DESC
   `
@@ -355,7 +355,7 @@ export async function getStudentRequests() {
   const rows = await sql<Record<string, unknown>>`
     SELECT br.*, b.title as book_title, b.author as book_author, b.pdf_url as book_pdf_url
     FROM borrow_requests br
-    JOIN books b ON br.book_id = b.id
+    LEFT JOIN books b ON br.book_id = b.id
     WHERE br.member_id = ${user.member_id}
     ORDER BY br.created_at DESC
   `

@@ -105,22 +105,38 @@ export function CirculationPage() {
   const [approveDuration, setApproveDuration] = useState("14")
 
   async function loadData() {
+    setLoading(true)
+    setError("")
+
     try {
-      const [txData, bookData, memberData, requestData] = await Promise.all([
-        getTransactions(search || undefined, statusFilter !== "all" ? statusFilter : undefined),
-        getBooks(),
-        getMembers(),
-        getPendingRequests(),
-      ])
+      const txData = await getTransactions(search || undefined, statusFilter !== "all" ? statusFilter : undefined)
       setTransactions(txData)
+    } catch {
+      setError("Failed to load transactions")
+    }
+
+    try {
+      const bookData = await getBooks()
       setBooks(bookData)
+    } catch {
+      setError("Failed to load books")
+    }
+
+    try {
+      const memberData = await getMembers()
       setMembers(memberData)
+    } catch {
+      setError("Failed to load members")
+    }
+
+    try {
+      const requestData = await getPendingRequests()
       setRequests(requestData)
     } catch {
-      setError("Failed to load data")
-    } finally {
-      setLoading(false)
+      setError("Failed to load borrow requests")
     }
+
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -190,6 +206,7 @@ export function CirculationPage() {
 
   async function handleCheckOverdue() {
     setSaving(true)
+    setError("")
     try {
       const alerts = await checkOverdueBooks()
       setOverdueAlerts(alerts)
@@ -268,6 +285,26 @@ export function CirculationPage() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-destructive bg-destructive/5 p-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-destructive">Error</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto shrink-0"
+              onClick={() => { setError(""); loadData() }}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
 
       {overdueAlerts.length > 0 && (
         <Card className="border-destructive/50 bg-destructive/5">
