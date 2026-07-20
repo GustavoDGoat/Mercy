@@ -14,6 +14,7 @@ export async function migrate(): Promise<void> {
         created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
       )
     `
+    await execute`ALTER TABLE users ALTER COLUMN fingerprint_hash DROP NOT NULL`
     await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_template TEXT`
     await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_platform TEXT`
     await execute`ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint_template_encrypted TEXT`
