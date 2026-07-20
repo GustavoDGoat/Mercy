@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using Bridge.Host.Models;
 
 namespace Bridge.Host.Scanners;
 
