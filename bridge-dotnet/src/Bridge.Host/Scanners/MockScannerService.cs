@@ -21,7 +21,7 @@ public class MockScannerService : IScannerService
         return new ScannerStatus
         {
             Connected = true,
-            Mode = ScannerMode.Mock,
+            Mode = ScannerMode.Mock.ToString(),
             State = _isScanning ? "scanning" : "idle",
             Device = new DeviceInfo
             {
@@ -193,7 +193,7 @@ public class MockScannerService : IScannerService
     {
         return new HealthReport
         {
-            Mode = ScannerMode.Mock,
+            Mode = ScannerMode.Mock.ToString(),
             SdkInstalled = false,
             ScannerConnected = true,
             SecretConfigured = SystemChecks.IsSecretConfigured(),

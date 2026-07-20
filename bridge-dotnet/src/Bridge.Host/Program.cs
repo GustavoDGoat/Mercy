@@ -258,7 +258,7 @@ static string ExtractUserIdFromTemplate(string templateBase64)
 
     using var sha = System.Security.Cryptography.SHA256.Create();
     var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(templateBase64));
-    return Convert.ToHexStringLower(hash)[..16];
+    return Convert.ToHexString(hash).ToLowerInvariant()[..16];
 }
 
 BridgeLogger.Info("bridge_ready", $"Listening on http://127.0.0.1:{builder.Configuration.GetValue<int>("Bridge:Port")}");

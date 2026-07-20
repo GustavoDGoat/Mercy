@@ -99,7 +99,7 @@ internal sealed class DpSdkScannerService : IScannerService
     {
         return new HealthReport
         {
-            Mode = ScannerMode.Real,
+            Mode = ScannerMode.Real.ToString(),
             SdkInstalled = true,
             ScannerConnected = false,
             SecretConfigured = SystemChecks.IsSecretConfigured()
