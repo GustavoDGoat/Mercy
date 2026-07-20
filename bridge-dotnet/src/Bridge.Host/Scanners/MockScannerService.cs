@@ -36,7 +36,7 @@ public class MockScannerService : IScannerService
         };
     }
 
-    public Task<EnrollResult> EnrollAsync(CancellationToken ct)
+    public async Task<EnrollResult> EnrollAsync(CancellationToken ct)
     {
         lock (_lock)
         {
@@ -49,35 +49,32 @@ public class MockScannerService : IScannerService
 
         try
         {
-            return Task.Run(async () =>
+            _currentFingerId = Guid.NewGuid().ToString("N")[..12];
+
+            for (int i = 1; i <= 4; i++)
             {
-                _currentFingerId = Guid.NewGuid().ToString("N")[..12];
+                if (_cancelled) throw new OperationCanceledException(ct);
+                await Task.Delay(1200, ct);
+                if (_cancelled) throw new OperationCanceledException(ct);
+                if (i < 4) await Task.Delay(800, ct);
+            }
 
-                for (int i = 1; i <= 4; i++)
-                {
-                    if (_cancelled) throw new OperationCanceledException(ct);
-                    await Task.Delay(1200, ct);
-                    if (_cancelled) throw new OperationCanceledException(ct);
-                    if (i < 4) await Task.Delay(800, ct);
-                }
+            var qualityScore = RandomNumberGenerator.GetInt32(80, 96);
+            var nonce = Guid.NewGuid().ToString("N")[..8];
+            var payload = $"{_currentFingerId}|{qualityScore}|4|{nonce}";
+            var template = MockTemplatePrefix + Convert.ToBase64String(
+                System.Text.Encoding.UTF8.GetBytes(payload));
 
-                var qualityScore = RandomNumberGenerator.GetInt32(80, 96);
-                var nonce = Guid.NewGuid().ToString("N")[..8];
-                var payload = $"{_currentFingerId}|{qualityScore}|4|{nonce}";
-                var template = MockTemplatePrefix + Convert.ToBase64String(
-                    System.Text.Encoding.UTF8.GetBytes(payload));
+            Interlocked.Increment(ref _captureCount);
 
-                Interlocked.Increment(ref _captureCount);
-
-                return new EnrollResult
-                {
-                    Template = template,
-                    Platform = PlatformTag,
-                    QualityScore = qualityScore,
-                    CaptureCount = 4,
-                    Status = "complete"
-                };
-            }, ct);
+            return new EnrollResult
+            {
+                Template = template,
+                Platform = PlatformTag,
+                QualityScore = qualityScore,
+                CaptureCount = 4,
+                Status = "complete"
+            };
         }
         finally
         {
@@ -85,7 +82,7 @@ public class MockScannerService : IScannerService
         }
     }
 
-    public Task<VerifyResult> VerifyAsync(string templateBase64, string platformTag, CancellationToken ct)
+    public async Task<VerifyResult> VerifyAsync(string templateBase64, string platformTag, CancellationToken ct)
     {
         lock (_lock)
         {
@@ -98,71 +95,68 @@ public class MockScannerService : IScannerService
 
         try
         {
-            return Task.Run(async () =>
+            if (_cancelled) throw new OperationCanceledException(ct);
+
+            if (platformTag != PlatformTag)
             {
-                if (_cancelled) throw new OperationCanceledException(ct);
-
-                if (platformTag != PlatformTag)
-                {
-                    return new VerifyResult
-                    {
-                        Match = false,
-                        Score = 0,
-                        LatencyMs = 0,
-                        Quality = 0,
-                        Error = $"Platform mismatch: enrolled on '{platformTag}', this kiosk is '{PlatformTag}'."
-                    };
-                }
-
-                if (!templateBase64.StartsWith(MockTemplatePrefix))
-                {
-                    return new VerifyResult
-                    {
-                        Match = false,
-                        Score = 0,
-                        LatencyMs = 0,
-                        Quality = 0,
-                        Error = "Cannot verify non-mock template in mock mode. Install DP SDK for real templates."
-                    };
-                }
-
-                await Task.Delay(800, ct);
-                if (_cancelled) throw new OperationCanceledException(ct);
-
-                string storedFingerId;
-                try
-                {
-                    var raw = Convert.FromBase64String(templateBase64[MockTemplatePrefix.Length..]);
-                    storedFingerId = System.Text.Encoding.UTF8.GetString(raw).Split('|')[0];
-                }
-                catch
-                {
-                    return new VerifyResult
-                    {
-                        Match = false,
-                        Score = 0,
-                        LatencyMs = 812,
-                        Quality = 0,
-                        Error = "Invalid template data — corrupted or wrong format."
-                    };
-                }
-
-                var match = storedFingerId == _currentFingerId;
-                var score = match
-                    ? RandomNumberGenerator.GetInt32(92, 100)
-                    : RandomNumberGenerator.GetInt32(5, 25);
-                var quality = match
-                    ? RandomNumberGenerator.GetInt32(80, 95)
-                    : RandomNumberGenerator.GetInt32(20, 45);
-
                 return new VerifyResult
                 {
-                    Match = match,
-                    Score = score,
-                    LatencyMs = 812,
-                    Quality = quality
+                    Match = false,
+                    Score = 0,
+                    LatencyMs = 0,
+                    Quality = 0,
+                    Error = $"Platform mismatch: enrolled on '{platformTag}', this kiosk is '{PlatformTag}'."
                 };
-            }, ct);
+            }
+
+            if (!templateBase64.StartsWith(MockTemplatePrefix))
+            {
+                return new VerifyResult
+                {
+                    Match = false,
+                    Score = 0,
+                    LatencyMs = 0,
+                    Quality = 0,
+                    Error = "Cannot verify non-mock template in mock mode. Install DP SDK for real templates."
+                };
+            }
+
+            await Task.Delay(800, ct);
+            if (_cancelled) throw new OperationCanceledException(ct);
+
+            string storedFingerId;
+            try
+            {
+                var raw = Convert.FromBase64String(templateBase64[MockTemplatePrefix.Length..]);
+                storedFingerId = System.Text.Encoding.UTF8.GetString(raw).Split('|')[0];
+            }
+            catch
+            {
+                return new VerifyResult
+                {
+                    Match = false,
+                    Score = 0,
+                    LatencyMs = 812,
+                    Quality = 0,
+                    Error = "Invalid template data — corrupted or wrong format."
+                };
+            }
+
+            var match = storedFingerId == _currentFingerId;
+            var score = match
+                ? RandomNumberGenerator.GetInt32(92, 100)
+                : RandomNumberGenerator.GetInt32(5, 25);
+            var quality = match
+                ? RandomNumberGenerator.GetInt32(80, 95)
+                : RandomNumberGenerator.GetInt32(20, 45);
+
+            return new VerifyResult
+            {
+                Match = match,
+                Score = score,
+                LatencyMs = 812,
+                Quality = quality
+            };
         }
         finally
         {

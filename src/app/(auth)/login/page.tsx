@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { login, verifyMfa } from "./actions"
-import { checkScannerStatus, verifyFingerprint, type ScannerStatus } from "@/lib/fingerprint"
+import { checkScannerStatus, verifyFingerprint, restartScanner, type ScannerStatus } from "@/lib/fingerprint"
 
 type MfaState = "checking" | "no_scanner" | "no_fingerprint" | "platform_mismatch" | "ready" | "scanning" | "match" | "no_match" | "locked"
 
@@ -145,6 +145,14 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Fingerprint verification failed"
+      if (msg.includes("busy") || msg.includes("409")) {
+        setError("Scanner busy — resetting...")
+        try { await restartScanner() } catch { }
+        await new Promise((r) => setTimeout(r, 2000))
+        setError("")
+        setMfaState("ready")
+        return
+      }
       setError(msg)
       setMfaState("ready")
     }
