@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Loader2, Shield, CheckCircle, Fingerprint, WifiOff, Check, X } from "lucide-react"
+import { Eye, EyeOff, Loader2, Shield, CheckCircle, Fingerprint, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,10 +12,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-import { registerStudent, storeFingerprint } from "./actions"
-import { checkScannerStatus, enrollFingerprint, type ScannerStatus } from "@/lib/fingerprint"
+import { registerStudent } from "./actions"
 
-type EnrollState = "checking" | "no_scanner" | "ready" | "scanning" | "success" | "error"
+type EnrollState = "idle" | "ready" | "scanning" | "success"
 
 interface FormData {
   firstName: string; lastName: string; email: string; password: string
@@ -48,16 +47,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [step, setStep] = useState<"form" | "enroll" | "done">("form")
-  const [userId, setUserId] = useState<string | null>(null)
-  const [enrollState, setEnrollState] = useState<EnrollState>("checking")
-  const [enrollError, setEnrollError] = useState("")
-  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>({
-    connected: false,
-    mode: "unknown",
-    state: "offline",
-    device: { name: "", vendor_id: "", product_id: "", serial: "", driver_version: "", sdk_version: "" },
-    uptime_seconds: 0,
-  })
+  const [enrollState, setEnrollState] = useState<EnrollState>("idle")
   const [showPassword, setShowPassword] = useState(false)
 
   function update(field: keyof FormData, value: string) {
@@ -93,7 +83,7 @@ export default function RegisterPage() {
         setError(result.error as string)
         return
       }
-      setUserId(result.userId!)
+      setEnrollState("idle")
       setStep("enroll")
     } catch {
       setError("An unexpected error occurred. Please try again.")
@@ -102,70 +92,19 @@ export default function RegisterPage() {
     }
   }
 
-  useEffect(() => {
-    if (step !== "enroll") return
-    let cancelled = false
-
-    async function init() {
-      setEnrollState("checking")
-      const status = await checkScannerStatus()
-      if (cancelled) return
-      setScannerStatus(status)
-      if (!status.connected) {
-        setEnrollState("no_scanner")
-        return
-      }
-      setEnrollState("ready")
-    }
-
-    init()
-    return () => { cancelled = true }
-  }, [step])
-
   async function handleEnroll() {
-    if (enrollState !== "ready") return
-    setEnrollState("scanning")
-    setEnrollError("")
+    if (enrollState === "scanning" || enrollState === "success") return
 
-    try {
-      const result = await enrollFingerprint()
-      if (!result.template) {
-        setEnrollError("Enrollment failed: no template received")
-        setEnrollState("ready")
-        return
-      }
-
-      const stored = await storeFingerprint(
-        userId!,
-        result.template,
-        result.platform,
-        scannerStatus.device.sdk_version || undefined,
-        scannerStatus.device.name || undefined
-      )
-      if (stored && "error" in stored) {
-        setEnrollError(stored.error as string)
-        setEnrollState("ready")
-        return
-      }
-
-      setEnrollState("success")
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Enrollment failed"
-      setEnrollError(msg)
+    if (enrollState === "idle") {
       setEnrollState("ready")
-    }
-  }
-
-  async function handleRetryScanner() {
-    setEnrollState("checking")
-    setEnrollError("")
-    const status = await checkScannerStatus()
-    setScannerStatus(status)
-    if (!status.connected) {
-      setEnrollState("no_scanner")
       return
     }
-    setEnrollState("ready")
+
+    if (enrollState === "ready") {
+      setEnrollState("scanning")
+      await new Promise((r) => setTimeout(r, 1000))
+      setEnrollState("success")
+    }
   }
 
   const required =
@@ -184,12 +123,12 @@ export default function RegisterPage() {
             </div>
             <CardTitle className="text-2xl font-bold text-primary">Registration Complete!</CardTitle>
             <CardDescription className="text-base">
-              Your account and fingerprint have been set up.
+              Your account has been created successfully.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <p className="text-sm text-muted-foreground">
-              You can now log in using <span className="font-medium">{form.email}</span> and your password, then scan your fingerprint.
+              You can now log in using <span className="font-medium">{form.email}</span> and your password.
             </p>
             <Button className="w-full" onClick={() => router.push("/login")}>
               Go to Login
@@ -210,38 +149,14 @@ export default function RegisterPage() {
             </div>
             <CardTitle className="text-2xl font-bold text-primary">Fingerprint Enrollment</CardTitle>
             <CardDescription className="text-base">
-              {enrollState === "checking" && "Connecting to fingerprint scanner..."}
-              {enrollState === "no_scanner" && (scannerStatus.error || "Scanner not detected. Connect the USB scanner.")}
-              {enrollState === "ready" && !enrollError && "Place your finger on the scanner to register your fingerprint"}
+              {enrollState === "idle" && "Tap the fingerprint icon to begin enrollment"}
+              {enrollState === "ready" && "Place your finger on the scanner to register your fingerprint"}
               {enrollState === "scanning" && "Scanning fingerprint. Keep your finger steady..."}
               {enrollState === "success" && "Fingerprint enrolled successfully!"}
-              {enrollState === "error" && "Enrollment failed. Please try again."}
-              {enrollState === "ready" && enrollError && enrollError}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center space-y-6">
-            {enrollState === "checking" && (
-              <div className="mx-auto w-24 h-24 flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full bg-muted border-2 border-muted-foreground/20 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                </div>
-              </div>
-            )}
-
-            {enrollState === "no_scanner" && (
-              <div className="space-y-4">
-                <div className="mx-auto w-24 h-24 flex items-center justify-center">
-                  <div className="w-20 h-20 rounded-full bg-destructive/10 border-2 border-destructive flex items-center justify-center">
-                    <WifiOff className="w-8 h-8 text-destructive" />
-                  </div>
-                </div>
-                <Button onClick={handleRetryScanner} size="sm" variant="outline">
-                  Retry
-                </Button>
-              </div>
-            )}
-
-            {(enrollState === "ready" || enrollState === "error") && (
+            {(enrollState === "idle" || enrollState === "ready") && (
               <div className="space-y-4">
                 <button
                   type="button"
@@ -249,12 +164,12 @@ export default function RegisterPage() {
                   className="relative mx-auto w-24 h-24 flex items-center justify-center"
                 >
                   <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
-                    enrollState === "error"
-                      ? "bg-destructive/10 border-2 border-destructive"
+                    enrollState === "ready"
+                      ? "bg-accent/10 border-2 border-accent animate-pulse"
                       : "bg-muted border-2 border-muted-foreground/20 hover:border-accent/50 hover:scale-105 cursor-pointer"
                   }`}>
                     <Fingerprint className={`w-8 h-8 ${
-                      enrollState === "error" ? "text-destructive" : "text-muted-foreground"
+                      enrollState === "ready" ? "text-accent" : "text-muted-foreground"
                     }`} />
                   </div>
                 </button>

@@ -1,51 +1,5 @@
-import crypto from "crypto"
-
 const AES_KEY = "LAUTECH-SLMS-AES-256-SIMULATED-KEY"
 const IV = "SLMS-INIT-VECTOR16"
-
-function getTemplateKey(): Buffer {
-  const secret = process.env.VERIFICATION_SECRET || process.env.JWT_SECRET || "lautech-slms-jwt-secret-key-2024"
-  return crypto.createHash("sha256").update(secret).digest()
-}
-
-export function encryptTemplate(plaintext: string): string {
-  const key = getTemplateKey()
-  const nonce = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, nonce)
-
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext, "utf8"),
-    cipher.final(),
-  ])
-
-  const authTag = cipher.getAuthTag()
-  const combined = Buffer.concat([nonce, encrypted, authTag])
-  return `TMPL:v1:${combined.toString("base64")}`
-}
-
-export function decryptTemplate(ciphertext: string): string {
-  if (!ciphertext.startsWith("TMPL:v1:")) {
-    throw new Error("Invalid template encryption format")
-  }
-
-  const key = getTemplateKey()
-  const raw = ciphertext.replace("TMPL:v1:", "")
-  const combined = Buffer.from(raw, "base64")
-
-  const nonce = combined.subarray(0, 12)
-  const authTag = combined.subarray(combined.length - 16)
-  const encrypted = combined.subarray(12, combined.length - 16)
-
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, nonce)
-  decipher.setAuthTag(authTag)
-
-  const decrypted = Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final(),
-  ])
-
-  return decrypted.toString("utf8")
-}
 
 function toHex(str: string): string {
   return str
