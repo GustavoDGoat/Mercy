@@ -116,6 +116,15 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
     return null
   }
 
+  const booksByCategory = books.reduce<Record<string, typeof books>>((acc, book) => {
+    const cat = book.category || "Uncategorized"
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(book)
+    return acc
+  }, {})
+
+  const sortedCategories = Object.keys(booksByCategory).sort()
+
   return (
     <div className="space-y-6">
       <div>
@@ -254,75 +263,91 @@ export function StudentDashboard({ user, stats, books, transactions: initialTx }
 
         <TabsContent value="catalog" className="mt-4 space-y-4">
           <p className="text-sm text-muted-foreground">
-            {books.filter((b) => b.availableCopies > 0).length} books available out of {books.length} total.
+            {books.filter((b) => b.availableCopies > 0).length} books available across {sortedCategories.length} categories.
           </p>
           <ScrollArea className="h-[60vh]">
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Format</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {books.map((book) => {
-                    const activeLoanTx = transactions.find((t) => t.bookId === book.id && t.status === "active")
-                    const activeLoan = activeLoanTx != null
-                    const pending = hasPendingRequest(book.id)
-                    const approvedInfo = getApprovedRequest(book.id)
-
-                    return (
-                      <TableRow key={book.id}>
-                        <TableCell className="font-medium max-w-[200px] truncate">{book.title}</TableCell>
-                        <TableCell className="text-sm max-w-[150px] truncate">{book.author}</TableCell>
-                        <TableCell className="text-sm">{book.category}</TableCell>
-                        <TableCell>
-                          {book.pdfUrl ? (
-                            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                              Digital + Physical
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-gray-100 text-gray-800">Physical Only</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {activeLoan ? (
-                            <Badge className="bg-green-100 text-green-800">
-                              Borrowed ({approvedInfo?.daysLeft}d left)
-                            </Badge>
-                          ) : pending ? (
-                            <Badge className="bg-amber-100 text-amber-800">Request Pending</Badge>
-                          ) : book.availableCopies > 0 ? (
-                            <Badge className="bg-green-100 text-green-800">{book.availableCopies} available</Badge>
-                          ) : (
-                            <Badge className="bg-red-100 text-red-800">Unavailable</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {activeLoanTx && book.pdfUrl ? (
-                            <Button variant="outline" size="sm" onClick={() => router.push(`/books/read/${activeLoanTx.id}`)}>
-                              <BookOpen className="w-4 h-4" />Continue Reading
-                            </Button>
-                          ) : !activeLoan && !pending && book.availableCopies > 0 ? (
-                            <Button size="sm" onClick={() => openBorrow(book)}>
-                              <BookCopy className="w-4 h-4" />Borrow
-                            </Button>
-                          ) : pending ? (
-                            <span className="text-xs text-muted-foreground">Awaiting approval</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Unavailable</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+            <div className="space-y-4">
+              {sortedCategories.map((category) => {
+                const categoryBooks = booksByCategory[category]
+                const available = categoryBooks.filter((b) => b.availableCopies > 0).length
+                return (
+                  <Card key={category}>
+                    <CardHeader className="py-3 px-4">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-muted-foreground" />
+                        {category}
+                        <Badge variant="secondary" className="ml-auto text-xs">
+                          {available} / {categoryBooks.length} available
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Author</TableHead>
+                            <TableHead>Format</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {categoryBooks.map((book) => {
+                            const activeLoanTx = transactions.find((t) => t.bookId === book.id && t.status === "active")
+                            const activeLoan = activeLoanTx != null
+                            const pending = hasPendingRequest(book.id)
+                            const approvedInfo = getApprovedRequest(book.id)
+                            return (
+                              <TableRow key={book.id}>
+                                <TableCell className="font-medium max-w-[200px] truncate">{book.title}</TableCell>
+                                <TableCell className="text-sm max-w-[150px] truncate">{book.author}</TableCell>
+                                <TableCell>
+                                  {book.pdfUrl ? (
+                                    <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                      Digital
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-gray-100 text-gray-800">Physical</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {activeLoan ? (
+                                    <Badge className="bg-green-100 text-green-800">
+                                      Borrowed ({approvedInfo?.daysLeft}d left)
+                                    </Badge>
+                                  ) : pending ? (
+                                    <Badge className="bg-amber-100 text-amber-800">Request Pending</Badge>
+                                  ) : book.availableCopies > 0 ? (
+                                    <Badge className="bg-green-100 text-green-800">{book.availableCopies} available</Badge>
+                                  ) : (
+                                    <Badge className="bg-red-100 text-red-800">Unavailable</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {activeLoanTx && book.pdfUrl ? (
+                                    <Button variant="outline" size="sm" onClick={() => router.push(`/books/read/${activeLoanTx.id}`)}>
+                                      <BookOpen className="w-4 h-4" />Continue Reading
+                                    </Button>
+                                  ) : !activeLoan && !pending && book.availableCopies > 0 ? (
+                                    <Button size="sm" onClick={() => openBorrow(book)}>
+                                      <BookCopy className="w-4 h-4" />Borrow
+                                    </Button>
+                                  ) : pending ? (
+                                    <span className="text-xs text-muted-foreground">Awaiting approval</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">Unavailable</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </ScrollArea>
         </TabsContent>

@@ -217,6 +217,15 @@ export function BooksPage() {
     }
   }
 
+  const booksByCategory = books.reduce<Record<string, Book[]>>((acc, book) => {
+    const cat = book.category || "Uncategorized"
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push(book)
+    return acc
+  }, {})
+
+  const sortedCategories = Object.keys(booksByCategory).sort()
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -265,101 +274,110 @@ export function BooksPage() {
           <p className="text-sm">Try adjusting your search or add a new book.</p>
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Book</TableHead>
-                <TableHead>Author</TableHead>
-                <TableHead>ISBN</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-center">Copies</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>RFID Tag</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {books.map((book) => (
-                <TableRow key={book.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-3">
-                      {book.coverImage ? (
-                        <img
-                          src={book.coverImage}
-                          alt={book.title}
-                          className="w-10 h-14 rounded object-cover border bg-muted"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = "none"
-                          }}
-                        />
-                      ) : (
-                        <div className="w-10 h-14 rounded border bg-muted flex items-center justify-center shrink-0">
-                          <BookOpen className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate max-w-[200px]">{book.title}</p>
-                        <p className="text-xs text-muted-foreground">{book.edition}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-[150px] truncate">{book.author}</TableCell>
-                  <TableCell className="text-xs font-mono">{book.isbn}</TableCell>
-                  <TableCell>{book.category}</TableCell>
-                  <TableCell className="text-center">
-                    <span
-                      className={
-                        book.availableCopies === 0 ? "text-destructive font-medium" : ""
-                      }
-                    >
-                      {book.availableCopies}
-                    </span>
-                    <span className="text-muted-foreground"> / {book.totalCopies}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={statusColors[book.status] || ""}>
-                      {book.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {book.rfidTagId ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-mono bg-primary/5 px-2 py-0.5 rounded">
-                        <QrCode className="w-3 h-3" />
-                        {book.rfidTagId}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {book.pdfUrl && (
-                        <Button variant="ghost" size="icon" onClick={() => openRead(book)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(book)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingBook(book)
-                          setDeleteDialogOpen(true)
-                          setError("")
-                        }}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-4">
+          {sortedCategories.map((category) => {
+            const categoryBooks = booksByCategory[category]
+            const available = categoryBooks.filter((b) => b.status === "available").length
+            return (
+              <div key={category} className="rounded-md border">
+                <div className="flex items-center gap-2 px-4 py-3 bg-muted/30 border-b">
+                  <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-semibold">{category}</span>
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {available} / {categoryBooks.length} available
+                  </Badge>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Book</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>ISBN</TableHead>
+                      <TableHead className="text-center">Copies</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>RFID Tag</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {categoryBooks.map((book) => (
+                      <TableRow key={book.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            {book.coverImage ? (
+                              <img
+                                src={book.coverImage}
+                                alt={book.title}
+                                className="w-10 h-14 rounded object-cover border bg-muted"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none"
+                                }}
+                              />
+                            ) : (
+                              <div className="w-10 h-14 rounded border bg-muted flex items-center justify-center shrink-0">
+                                <BookOpen className="w-4 h-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate max-w-[200px]">{book.title}</p>
+                              <p className="text-xs text-muted-foreground">{book.edition}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[150px] truncate">{book.author}</TableCell>
+                        <TableCell className="text-xs font-mono">{book.isbn}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={book.availableCopies === 0 ? "text-destructive font-medium" : ""}>
+                            {book.availableCopies}
+                          </span>
+                          <span className="text-muted-foreground"> / {book.totalCopies}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={statusColors[book.status] || ""}>
+                            {book.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {book.rfidTagId ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-mono bg-primary/5 px-2 py-0.5 rounded">
+                              <QrCode className="w-3 h-3" />
+                              {book.rfidTagId}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {book.pdfUrl && (
+                              <Button variant="ghost" size="icon" onClick={() => openRead(book)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(book)}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setEditingBook(book)
+                                setDeleteDialogOpen(true)
+                                setError("")
+                              }}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
+          })}
         </div>
       )}
 
